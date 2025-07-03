@@ -1,5 +1,6 @@
 streamlit
 pytesseract
+Pillow
 pdf2image
 pdfminer.six
-Pillow
+opencv-python
