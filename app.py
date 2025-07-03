@@ -51,10 +51,16 @@ def convert_pdf_to_images(pdf_bytes):
     images = []
 
     for page_number in range(len(pdf_document)):
-        page = pdf_document[page_number]
-        pix = page.get_pixmap()
-        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
-        images.append(img)
+        try:
+            page = pdf_document[page_number]
+            pix = page.get_pixmap()
+            img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            images.append(img)
+        except Exception as e:
+            st.warning(f"Skipping page {page_number + 1} due to error: {e}")
+
+    if not images:
+        raise Exception("No valid images could be extracted from the PDF. Please upload a valid PDF.")
 
     return images
 
