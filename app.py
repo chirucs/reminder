@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from PIL import Image
-from pdf2image import convert_from_bytes
 from pdfminer.high_level import extract_text as extract_pdf_text
 import io
 import re
@@ -42,20 +41,37 @@ def extract_text_from_image(image_bytes):
     results = reader.readtext(np_img, detail=0)
     return '\n'.join(results)
 
+def convert_pdf_to_images_online(pdf_bytes):
+    # Use an online API to convert PDF to images
+    api_url = "https://api.pdf.co/v1/pdf/convert/to/image"
+    api_key = "YOUR_PDF_CO_API_KEY"  # Replace with your API key
+
+    files = {"file": pdf_bytes}
+    headers = {"x-api-key": api_key}
+
+    response = requests.post(api_url, files=files, headers=headers)
+    result = response.json()
+
+    if response.status_code == 200 and result.get("urls"):
+        image_urls = result["urls"]
+        images = []
+        for url in image_urls:
+            img_response = requests.get(url)
+            img = Image.open(io.BytesIO(img_response.content))
+            images.append(img)
+        return images
+    else:
+        error_message = result.get("message", "Unknown error") if isinstance(result, dict) else "Unknown error"
+        raise Exception(f"PDF-to-Image API error: {error_message}")
+
 def extract_text_from_pdf(pdf_bytes):
-    # Try extracting text directly (for text-based PDFs)
-    text = extract_pdf_text(io.BytesIO(pdf_bytes))
-    if text.strip():
-        return text
-    # If no text found, fallback to OCR using EasyOCR
-    images = convert_from_bytes(pdf_bytes)
+    # Convert PDF to images using the online API
+    images = convert_pdf_to_images_online(pdf_bytes)
     ocr_text = ''
     for i, img in enumerate(images):
-        img_bytes = io.BytesIO()
-        img.save(img_bytes, format="JPEG")
-        img_bytes.seek(0)
+        np_img = np.array(img)
         ocr_text += f'--- Page {i+1} ---\n'
-        ocr_text += extract_text_from_image(img_bytes.read())
+        ocr_text += extract_text_from_image(np_img)
         ocr_text += '\n'
     return ocr_text
 
