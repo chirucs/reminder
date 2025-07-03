@@ -3,4 +3,4 @@ pytesseract
 Pillow
 pdf2image
 pdfminer.six
-opencv-python
+opencv-python-headless
