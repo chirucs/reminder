@@ -1,5 +1,5 @@
 import streamlit as st
-import pytesseract
+import requests
 from PIL import Image
 from pdf2image import convert_from_bytes
 from pdfminer.high_level import extract_text as extract_pdf_text
@@ -18,6 +18,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.base import MIMEBase
 from email import encoders
 import webbrowser
+import easyocr
 
 def preprocess_image(image_bytes):
     # A more robust, multi-step preprocessing pipeline for IDs
@@ -34,27 +35,27 @@ def preprocess_image(image_bytes):
     return processed_image
 
 def extract_text_from_image(image_bytes):
-    # Try both original and preprocessed for best result
-    original_text = pytesseract.image_to_string(Image.open(io.BytesIO(image_bytes)))
-    processed_image = preprocess_image(image_bytes)
-    processed_text = pytesseract.image_to_string(processed_image)
-
-    # Combine and return the one that likely has more info
-    if len(processed_text) > len(original_text):
-        return processed_text
-    return original_text
+    # Use EasyOCR for text extraction
+    reader = easyocr.Reader(['en'])
+    image = Image.open(io.BytesIO(image_bytes))
+    np_img = np.array(image)
+    results = reader.readtext(np_img, detail=0)
+    return '\n'.join(results)
 
 def extract_text_from_pdf(pdf_bytes):
     # Try extracting text directly (for text-based PDFs)
     text = extract_pdf_text(io.BytesIO(pdf_bytes))
     if text.strip():
         return text
-    # If no text found, fallback to OCR on images
+    # If no text found, fallback to OCR using EasyOCR
     images = convert_from_bytes(pdf_bytes)
     ocr_text = ''
     for i, img in enumerate(images):
+        img_bytes = io.BytesIO()
+        img.save(img_bytes, format="JPEG")
+        img_bytes.seek(0)
         ocr_text += f'--- Page {i+1} ---\n'
-        ocr_text += pytesseract.image_to_string(img)
+        ocr_text += extract_text_from_image(img_bytes.read())
         ocr_text += '\n'
     return ocr_text
 
@@ -304,7 +305,6 @@ def main():
 
     if uploaded_file:
         st.success("File uploaded successfully!")
-        file_path = save_uploaded_file(uploaded_file)
         file_bytes = uploaded_file.read()
 
         if uploaded_file.type == "application/pdf":
@@ -318,7 +318,7 @@ def main():
         if expiry_dates:
             for date in expiry_dates:
                 st.write(f"- {date}")
-                cal_link = create_google_calendar_link_with_local_path(date, file_path, "")
+                cal_link = create_google_calendar_link_with_local_path(date, "", "")
                 if cal_link:
                     st.markdown(f"[Add 30-day reminder to Google Calendar]({cal_link})", unsafe_allow_html=True)
                 else:
@@ -331,7 +331,7 @@ def main():
             recommended_date_str = selected_date.strftime("%m/%d/%Y")
             st.write(f"Selected expiry date: {recommended_date_str}")
 
-            cal_link = create_google_calendar_link_with_local_path(recommended_date_str, file_path, reference_location)
+            cal_link = create_google_calendar_link_with_local_path(recommended_date_str, "", reference_location)
             if cal_link:
                 st.markdown(f"[Add 30-day reminder to Google Calendar]({cal_link})", unsafe_allow_html=True)
 
