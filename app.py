@@ -1,6 +1,6 @@
 import streamlit as st
 import requests
-from PIL import Image
+from PIL import Image, UnidentifiedImageError
 import io
 import re
 from datetime import datetime
@@ -35,9 +35,13 @@ def preprocess_image(image_bytes):
 
 def extract_text_from_image(image_bytes):
     # Use EasyOCR for text extraction
-    reader = easyocr.Reader(['en'])
-    image = Image.open(io.BytesIO(image_bytes))
+    try:
+        image = Image.open(io.BytesIO(image_bytes))
+    except UnidentifiedImageError:
+        raise Exception("Invalid image format. Please upload a valid image.")
+
     np_img = np.array(image)
+    reader = easyocr.Reader(['en'])
     results = reader.readtext(np_img, detail=0)
     return '\n'.join(results)
 
