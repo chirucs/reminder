@@ -4,3 +4,4 @@ Pillow
 pdf2image
 pdfminer.six
 opencv-python-headless
+easyocr
