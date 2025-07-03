@@ -65,15 +65,24 @@ def convert_pdf_to_images(pdf_bytes):
     return images
 
 def extract_text_from_pdf(pdf_bytes):
-    # Convert PDF to images using PyMuPDF
-    images = convert_pdf_to_images(pdf_bytes)
-    ocr_text = ''
-    for i, img in enumerate(images):
-        np_img = np.array(img)
-        ocr_text += f'--- Page {i+1} ---\n'
-        ocr_text += extract_text_from_image(np_img)
-        ocr_text += '\n'
-    return ocr_text
+    try:
+        # Convert PDF to images using PyMuPDF
+        images = convert_pdf_to_images(pdf_bytes)
+        ocr_text = ''
+        for i, img in enumerate(images):
+            np_img = np.array(img)
+            ocr_text += f'--- Page {i+1} ---\n'
+            ocr_text += extract_text_from_image(np_img)
+            ocr_text += '\n'
+        return ocr_text
+    except Exception as e:
+        st.warning(f"Image extraction failed: {e}. Falling back to text extraction.")
+        pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+        text = ''
+        for page_number in range(len(pdf_document)):
+            page = pdf_document[page_number]
+            text += page.get_text()
+        return text
 
 def normalize_expiry_date(date_str):
     # Convert all to mm/dd/yyyy if possible, else mm/yyyy
