@@ -1,7 +1,6 @@
 import streamlit as st
 import requests
 from PIL import Image
-from pdfminer.high_level import extract_text as extract_pdf_text
 import io
 import re
 from datetime import datetime
@@ -18,6 +17,7 @@ from email.mime.base import MIMEBase
 from email import encoders
 import webbrowser
 import easyocr
+import fitz  # PyMuPDF
 
 def preprocess_image(image_bytes):
     # A more robust, multi-step preprocessing pipeline for IDs
@@ -41,32 +41,22 @@ def extract_text_from_image(image_bytes):
     results = reader.readtext(np_img, detail=0)
     return '\n'.join(results)
 
-def convert_pdf_to_images_online(pdf_bytes):
-    # Use an online API to convert PDF to images
-    api_url = "https://api.pdf.co/v1/pdf/convert/to/image"
-    api_key = "YOUR_PDF_CO_API_KEY"  # Replace with your API key
+def convert_pdf_to_images(pdf_bytes):
+    # Convert PDF to images using PyMuPDF
+    pdf_document = fitz.open(stream=pdf_bytes, filetype="pdf")
+    images = []
 
-    files = {"file": pdf_bytes}
-    headers = {"x-api-key": api_key}
+    for page_number in range(len(pdf_document)):
+        page = pdf_document[page_number]
+        pix = page.get_pixmap()
+        img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+        images.append(img)
 
-    response = requests.post(api_url, files=files, headers=headers)
-    result = response.json()
-
-    if response.status_code == 200 and result.get("urls"):
-        image_urls = result["urls"]
-        images = []
-        for url in image_urls:
-            img_response = requests.get(url)
-            img = Image.open(io.BytesIO(img_response.content))
-            images.append(img)
-        return images
-    else:
-        error_message = result.get("message", "Unknown error") if isinstance(result, dict) else "Unknown error"
-        raise Exception(f"PDF-to-Image API error: {error_message}")
+    return images
 
 def extract_text_from_pdf(pdf_bytes):
-    # Convert PDF to images using the online API
-    images = convert_pdf_to_images_online(pdf_bytes)
+    # Convert PDF to images using PyMuPDF
+    images = convert_pdf_to_images(pdf_bytes)
     ocr_text = ''
     for i, img in enumerate(images):
         np_img = np.array(img)
